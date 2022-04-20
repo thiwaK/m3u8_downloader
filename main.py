@@ -249,6 +249,8 @@ class aPlus(QWidget):
 
 		if os.name == 'nt':
 			OUT = os.environ['USERPROFILE'] + "\\Downloads\\" + OUT
+		else:
+			exit()
 
 		if not (os.path.exists(OUT)):
 			os.makedirs(OUT)

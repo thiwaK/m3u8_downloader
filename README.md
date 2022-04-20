@@ -16,7 +16,7 @@ aPlus downloader is originally developed for downloading videos hosted in apluse
 aPlus Downloader is a python-based GUI. The following requirements must be satisfied in order to use this.
 
 * python 3.x must be installed.
-* Any Windows or Linux operating system
+* Any Windows operating system
 
 ---
 
