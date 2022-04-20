@@ -1,19 +1,36 @@
-# m3u8 Downloader
+# aPlus Downloader
 Download and save m3u8 streams
 
-#### How to use
+[![Build Status](https://travis-ci.org/joemccann/dillinger.svg?branch=master)](https://travis-ci.org/joemccann/dillinger)
 
+aPlus downloader is originally developed for downloading videos hosted in apluseducation platform. By using a 9-digit code (xxxx-xxxx), the software allows generating an m3u8 link. By using that link or any other m3u8 link, the video stream can be saved to local storage.
+#### Requirements 
+aPlus Downloader is a python-based GUI. The following requirements must be satisfied in order to use this.
 ```
-Clone the repo 
-Install python 3.x 
-Run the script
-Paste the m3u8 URL in the box and Download
+python 3.x must be installed.
+Any windows or Linux operating system
 ```
-Note: File will be save into Downloads folder created in the directory
 
-Sample links
-- `https://devimages.apple.com.edgekey.net/iphone/samples/bipbop/bipbopall.m3u8`
-- `https://multiplatform-f.akamaihd.net/i/multi/will/bunny/big_buck_bunny_,640x360_400,640x360_700,640x360_1000,950x540_1500,.f4v.csmil/master.m3u8`
+### Installation
+```
+Clone the repo or download the zip and extract.
+Run aPlus_Video_Downloader
+
+Note: if there are additional modules needed, they will be installed automatically. Make sure you have connected to the internet !
+```
+
+### How to use
+```
+Currently, this tool cannot be used without login into apluseducation platform.
+
+1. Login with your aPlus username and password
+2. In the main UI, you have two options
+   - You can enter your Video ID and get the link
+   - You can directly enter the link
+3. Either way, after getting the m3u8 link, simply hit Download.
+
+Note: Downloaded videos will be saved to aPlus_Downloads folder in your Downloads directory
+```
 
 ## License
 
