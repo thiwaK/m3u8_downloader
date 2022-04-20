@@ -4,7 +4,11 @@ Download and save m3u8 streams
 [![Build Status](https://travis-ci.org/joemccann/dillinger.svg?branch=master)](https://travis-ci.org/joemccann/dillinger)
 
 aPlus downloader is originally developed for downloading videos hosted in apluseducation platform. By using a 9-digit code (xxxx-xxxx), the software allows generating an m3u8 link. By using that link or any other m3u8 link, the video stream can be saved to local storage.
-#### Requirements 
+
+![](https://raw.githubusercontent.com/thiwaK/m3u8_downloader/master/screenshot/2.png)
+
+
+### Requirements 
 
 aPlus Downloader is a python-based GUI. The following requirements must be satisfied in order to use this.
 
