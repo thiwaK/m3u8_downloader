@@ -118,7 +118,7 @@ class Client():
 			data = """{"app":"Aplus","Aplus":{"cred":{"user":"","pass":""},"dev_id":"","token":"","status":0,"user":""},"Ewings":{"cred":{"user":"","pass":""},"dev_id":"","token":"","status":0,"user":""}}"""
 			self.CRED = json.loads(data)
 
-	def setCredential(self):
+	def updateCredential(self):
 		'''write authentication details'''
 		with open(self.CRED_FILE, 'wb') as f:
 			data = json.dumps(self.CRED, ensure_ascii=False, indent=4)
@@ -127,18 +127,21 @@ class Client():
 
 	def registerDevice(self):
 		'''Register current device in remote server'''
+		
 		print("[+] Registering device...")
 		headers = self.merge(self.default_headers, {"App" : self.CRED['app'],"Content-Type" : 'application/x-www-form-urlencoded',"Authorization" : self.CRED[self.CRED['app']]['token'],"Device" : self.CRED[self.CRED['app']]['dev_id']})
-		data = "student_id=%s" % (self.CRED[self.CRED['app']]['user']['_id'])
+		data = "student_id=%s" % self.CRED[self.CRED['app']]['user']['_id']
 		response = self.session.request("POST", self.CONFIG[self.CRED['app']]['URL']['dev_reg'], data=data, headers=headers)
 		raw_response = response.text
-
-		if(json.loads(raw_response)['ok']):
+		js = json.loads(raw_response)
+		if(js['ok']):
 			self.CRED[self.CRED['app']]['status'] = 2
 		else:
 			print('[-] Failed')
 			self.CRED[self.CRED['app']]['status'] = 1
-		self.setCredential()
+		self.updateCredential()
+		print("[+] Done")
+		exit()
 
 	def login(self, mobile_number, password, app_name):
 		'''login into online account(Aplus)'''
@@ -168,9 +171,9 @@ class Client():
 			
 			if(self.CRED[app_name]['status']!=2):
 				self.CRED[app_name]['dev_id'] = DEVICE
-				self.CRED[app_name]['state'] = 1
-			print(self.CRED)
-			self.setCredential()
+				self.CRED[app_name]['status'] = 1
+
+			self.updateCredential()
 
 
 			return 1
@@ -238,7 +241,7 @@ class Client():
 		elif(jsonData['output'] == 'Invalid device id'):
 			print("[!] Warning. Device must register")
 			self.CONFIG[self.CRED['app']]['status'] = 1
-			self.setCredential()
+			self.updateCredential()
 			self.registerDevice()
 			exit()
 		else:
@@ -400,9 +403,22 @@ class Main(QWidget):
 		self.formGroupBoxC.setLayout(layout_status)
 		self.formGroupBoxC.setFlat(True)
 
+		self.formGroupBoxD = QGroupBox("User")
+		layout_status = QFormLayout()
+		layout_status.addRow(QLabel("Name: "), QLabel("%s %s"% (self.client.CRED[self.client.CRED['app']]['user']['fname'].title(), self.client.CRED[self.client.CRED['app']]['user']['lname'].title())))
+		layout_status.addRow(QLabel("ID: "), QLabel("%s" % self.client.CRED[self.client.CRED['app']]['user']['_id']))
+		# layout_status.addRow(QLabel("Name: "), QLabel("Your Name"))
+		# layout_status.addRow(QLabel("ID: "), QLabel("Your User ID"))
+		self.formGroupBoxD.setLayout(layout_status)
+
+
 		menubar = QMenuBar()
-		actionFile = menubar.addMenu("Option")
-		actionFile.addAction("Reset")
+		actionFile = menubar.addMenu("Options")
+		reAuth = actionFile.addAction("Reauthenticate")
+		reAuth.setShortcut('Ctrl+R')
+		reAuth.setStatusTip('Authenticate again')
+		reAuth.triggered.connect(self.reAuth)
+		
 		exitAct = actionFile.addAction("Quit")
 		exitAct.setShortcut('Ctrl+Q')
 		exitAct.setStatusTip('Exit application')
@@ -410,9 +426,10 @@ class Main(QWidget):
 
 		layout = QVBoxLayout()
 		layout.addWidget(menubar)
-		layout.addWidget(QLabel(""))
-		layout.addWidget(QLabel("  Logged in as %s %s" % (self.client.CRED[self.client.CRED['app']]['user']['fname'].title(), self.client.CRED[self.client.CRED['app']]['user']['lname'].title())))
-		layout.addWidget(QLabel(""))
+		# layout.addWidget(QLabel(""))
+		# layout.addWidget(QLabel("  Logged in as %s %s" % (self.client.CRED[self.client.CRED['app']]['user']['fname'].title(), self.client.CRED[self.client.CRED['app']]['user']['lname'].title())))
+		# layout.addWidget(QLabel(""))
+		layout.addWidget(self.formGroupBoxD)
 		layout.addWidget(self.formGroupBoxA)
 		layout.addWidget(self.formGroupBoxB)
 		layout.addWidget(self.formGroupBoxC)
@@ -435,6 +452,11 @@ class Main(QWidget):
 
 		# t1=Thread(target=self.init)
 		# t1.start()
+
+	def reAuth(self):
+		self.client.CRED[self.client.CRED['app']]['status'] = 0
+		self.client.updateCredential()
+		self.client.login(self.client.CRED[self.client.CRED['app']]['cred']['user'], self.client.CRED[self.client.CRED['app']]['cred']['pass'], self.client.CRED['app'])
 
 	def Operation(self, URL):
 		URL = URL.strip()
