@@ -16,10 +16,6 @@
 
 aPlus Downloader originally developed to download videos hosted in Aplus education platform. By using a 9-digit code (xxxx-xxxx), this software able to generate an m3u8 link, which can be used to download the relevant video. By using that link or any other m3u8 link, this tool can save the video stream to local storage.
 
-
-
-![](https://raw.githubusercontent.com/thiwaK/m3u8_downloader/master/images/screenshot_1.png)
-
 ---
 
 ### Requirements 
@@ -52,8 +48,12 @@ Currently, this tool cannot be used without login into Aplus education platform.
 
 Note: Downloaded videos will be saved to aPlus_Downloads folder in your Downloads directory (`C:\Users\YOUR_USER_NAME\Downloads\aPlus_Downloads`). But if you want, you can change this settings by editing the script file.
 
+
+
+**NOTE: This application is designed for educational purposes only. I do not take any responsibility for any problems that may arise in the use of this.**
+
 ---
 
 ### License
 
-Apache 2.0es
+Apache 2.0
