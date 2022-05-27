@@ -1,25 +1,32 @@
-# aPlus Downloader 1.0.35
-Download and save m3u8 streams
+<p align="center">
+	<img src="https://raw.githubusercontent.com/thiwaK/m3u8_downloader/master/images/aPlus_Downloader_Logo.png" alt="aPlus Downloader Logo">
+</p>
+
+<h3 align="center">aPlus Downloader 1.0.35</h3>
+<p align="center">
+  Download m3u8 streams
+  <br>
+</p>
+
+
 
 ---
 
 [![Build Status](https://travis-ci.org/joemccann/dillinger.svg?branch=master)](https://travis-ci.org/joemccann/dillinger)
 
-aPlus Downloader is originally developed to download videos hosted in Aplus education platform. By using a 9-digit code (xxxx-xxxx), this software able to generate an m3u8 link, which can be used to download the relevant video. By using that link or any other m3u8 link, the video stream can be saved to local storage.
+aPlus Downloader originally developed to download videos hosted in Aplus education platform. By using a 9-digit code (xxxx-xxxx), this software able to generate an m3u8 link, which can be used to download the relevant video. By using that link or any other m3u8 link, this tool can save the video stream to local storage.
 
 
 
-![](https://raw.githubusercontent.com/thiwaK/m3u8_downloader/master/screenshot/2.png)
+![](https://raw.githubusercontent.com/thiwaK/m3u8_downloader/master/images/screenshot_1.png)
 
 ---
-
-Note: Currently this tool is support only for Aplus education platform. But it can further develop to support E-Wings platform also. If you are an Ewings user, contact me or contribute.
 
 ### Requirements 
 
 aPlus Downloader is a python-based GUI tool. The following requirements must be satisfied in order to use this.
 
-* Python 3.x must be installed and must add to PATH (environment variable).
+* [Python 3.x](https://www.python.org/downloads/windows/) must be installed and must add to PATH (environment variable).
 * Windows operating system
 
 ---
@@ -47,6 +54,6 @@ Note: Downloaded videos will be saved to aPlus_Downloads folder in your Download
 
 ---
 
-## License
+### License
 
-Apache 2.0
+Apache 2.0es
