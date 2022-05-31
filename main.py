@@ -11,31 +11,104 @@ try:
 	from threading import Thread
 	from datetime import date
 	from datetime import datetime
+	from datetime import timedelta
 	from requests import session
 	import os
 	import re
 	import io
 	import sys
 	import time
+	import signal
 	import base64
-	import threading
-	import json, random, base64
+	import subprocess
+	import json, base64
 except Exception:
 	import os
 	print("Trying to Install required modules ...\n")
-	os.system('python -m pip install -r requirements.txt')
+	os.system('python -m pip install PyQt5 requests')
 	exit()
 
 
-OUT = "aPlus_Downloads" # Output folder name in your Downloads(C:\Users\YOUR_USER_NAME\Downloads) folder
-DEBUG = 0 				# Enable/Disable Debug output
+output_folder = "aPlus_Downloads" 	# Output folder name in your Downloads(C:\Users\YOUR_USER_NAME\Downloads) folder
+DEBUG = 0 							# Enable/Disable Debug output
+
+
+
+class Worker(QObject):
+	finished = pyqtSignal()
+	progress = pyqtSignal(int)
+
+	def __init__(self):
+		super(QObject, self).__init__()
+		self.URL = ""
+
+	def kill(self):
+		print("[+] Terminate -> ", end='')
+		subprocess.Popen("TASKKILL /F /IM ffmpeg.exe /T")
+		
+	def run(self):
+		
+		today = date.today()
+		now = datetime.now()
+		dt_string = now.strftime("%Y_%m_%d__%H.%M.%S")
+
+		print("[+] output :", output_folder + "\\" + dt_string + ".mp4")
+		cmd = f"lib\\ffmpeg.exe -i \"{self.URL}\" -bsf:a aac_adtstoasc -v info -f mp4 -c copy \"{output_folder}\\{dt_string}.mp4\""
+		# cmd = f"ping localhost -n 5"
+		'''
+		# First 10 Minutes                      -ss 0 -t 00:10:00 
+		# Second 10 Minutes                     -ss 00:10:00 -t 00:20:00
+		# Rest after the first 20 Minutes       -ss 00:20:00
+		'''
+
+		process = subprocess.Popen(
+		cmd,
+		stdout=subprocess.PIPE,
+		stderr=subprocess.STDOUT,
+		shell=True,
+		encoding='utf-8',
+		bufsize = 1,
+		errors='replace')
+
+		duration_regex = r"(Duration: )(\d\d:\d\d:\d\d.\d\d)"
+		current_progress_regex = r"(time=)(\d\d:\d\d:\d\d.\d\d)"
+		self.progress.emit(0)
+		while True:
+
+			realtime_output = str(process.stdout.readline()).strip()
+			if realtime_output == '' and process.poll() is not None:
+				break
+
+			if realtime_output:
+				if re.match(duration_regex, realtime_output):
+					self.video_duration = re.findall(duration_regex, realtime_output)[0][1]
+					print("[+] Duration:", self.video_duration)
+				
+				elif("time=" in realtime_output):
+					current_progress = re.findall(current_progress_regex, realtime_output)[0][1]
+					
+					x = time.strptime(current_progress.split('.')[0],'%H:%M:%S')
+					y = time.strptime(self.video_duration.split('.')[0],'%H:%M:%S')
+					progress_in_sec = timedelta(hours=x.tm_hour,minutes=x.tm_min,seconds=x.tm_sec).total_seconds()
+					duration_in_sec = timedelta(hours=y.tm_hour,minutes=y.tm_min,seconds=y.tm_sec).total_seconds()
+
+					self.progress.emit(int((progress_in_sec/duration_in_sec)*100))
+					# print(int((progress_in_sec/duration_in_sec)*100))
+
+				else:
+					pass
+
+
+		print("[+] End download")
+		process.kill()
+		self.finished.emit()
 
 class Client():
 	'''API Client. Handle all API calls'''
 
 	def __init__(self, main):
 		
-		global OUT, DEBUG
+		global output_folder, DEBUG
 		if(DEBUG):
 			import requests
 			import logging
@@ -50,15 +123,16 @@ class Client():
 		self.main = main
 		
 		if os.name == 'nt':
-			OUT = os.environ['USERPROFILE'] + "\\Downloads\\" + OUT
+			output_folder = os.environ['USERPROFILE'] + "\\Downloads\\" + output_folder
 		else:
 			print("[-] Currently support for Windows OS only")
 			exit()
-		if not (os.path.exists(OUT)):
-			os.makedirs(OUT)
+		if not (os.path.exists(output_folder)):
+			os.makedirs(output_folder)
 
 		self.CRED_FILE = "lib\\cred.bin"
-		self.getCredential()
+		self._getCredential()
+		self.readDefaultConfig()
 
 		self.CONFIG = {}
 		self.CONFIG['Aplus'] = {
@@ -89,9 +163,7 @@ class Client():
 			return
 
 		elif(self.CRED[self.CRED['app']]['status'] == 2):
-			# ready to go. but first, validate the token
-			print("[+] Validate token")
-			# self.validateToken()
+			# ready to go !
 			return
 
 		else:
@@ -103,7 +175,21 @@ class Client():
 		z.update(y)
 		return z
 
-	def getCredential(self):
+	def readDefaultConfig(self):
+		try:
+			with open("lib\\defualt.conf") as fhandle:
+				self.default_config = json.loads(fhandle.read())
+		except Exception as e:
+			self.default_config = {'theme': 0}
+
+	def writeDefaultConfig(self):
+		try:
+			with open("lib\\defualt.conf", 'w') as fhandle:
+				fhandle.write(json.dumps(self.default_config))
+		except Exception as e:
+			print("[-] ERROR ", e)
+
+	def _getCredential(self):
 		'''load authentication details'''
 		try:
 			with open(self.CRED_FILE,'rb') as f:
@@ -118,7 +204,7 @@ class Client():
 			data = """{"app":"Aplus","Aplus":{"cred":{"user":"","pass":""},"dev_id":"","token":"","status":0,"user":""},"Ewings":{"cred":{"user":"","pass":""},"dev_id":"","token":"","status":0,"user":""}}"""
 			self.CRED = json.loads(data)
 
-	def updateCredential(self):
+	def _updateCredential(self):
 		'''write authentication details'''
 		with open(self.CRED_FILE, 'wb') as f:
 			data = json.dumps(self.CRED, ensure_ascii=False, indent=4)
@@ -139,8 +225,14 @@ class Client():
 		else:
 			print('[-] Failed')
 			self.CRED[self.CRED['app']]['status'] = 1
-		self.updateCredential()
+		self._updateCredential()
 		print("[+] Done")
+		exit()
+
+	def logout(self):
+		print("[+] logging out")
+		os.remove(output_folder)
+		qApp.quit()
 		exit()
 
 	def login(self, mobile_number, password, app_name):
@@ -169,11 +261,11 @@ class Client():
 			self.CRED[app_name]['user'] = USER
 			self.CRED[app_name]['token'] = TOKEN
 			
-			if(self.CRED[app_name]['status']!=2):
+			if(self.CRED[app_name]['status']==0):
 				self.CRED[app_name]['dev_id'] = DEVICE
 				self.CRED[app_name]['status'] = 1
 
-			self.updateCredential()
+			self._updateCredential()
 
 
 			return 1
@@ -182,22 +274,15 @@ class Client():
 			print("[-] Failed", e)
 			return 0
 
-	def validateToken(self):
-		'''validate saved token. if not, renew'''
-
-		headers = merge(self.default_headers, {"Authorization" : self.CRED[self.CRED['app']]['token'], "Content-Type" : "application/json"})
-		data = "{\"operationName\":null,\"variables\":{\"link\":\"%s\",\"devModel\":\"android-v2.278890df33ce40d6937df5138e3f7d58\"},\"query\":\"query GetLessonContent($link: String, $devModel: String) {\\n  __typename\\n  getLessonContent(link_param: $link, dev_model: $devModel) {\\n    __typename\\n    lesson {\\n      __typename\\n      _id\\n      title\\n      description\\n      video_code\\n      subject\\n    }\\n    is_subscribed\\n    lesson_viewer_key\\n    vid_url\\n    m_vid_url\\n    key\\n    hash\\n  }\\n}\"}"
-
-		r = self.session.request("POST", self.CONFIG[self.CRED['app']]['URL']['api'], data=data, headers=headers)
-		raw_response = r.text
-
-		jsonData = json.loads(raw_response)
-		try:
-			if(jsonData["errors"][0]["message"]=="TokenExpiredError: jwt expired"):
-				print("   - Re-authenticating...")
-				self.login(self.CRED[self.CRED['app']]['cred']['user'], self.CRED[self.CRED['app']]['cred']['pass'], self.CRED['app'])
-		except Exception as e:
-			print(e)
+	def reAuth(self):
+		print("[+] Re-Authorize")
+		self.CRED[self.CRED['app']]['status'] = 0
+		self._updateCredential()
+		self.updateAuth()
+	
+	def updateAuth(self):
+		print("[+] Update token. Retry")
+		self.login(self.CRED[self.CRED['app']]['cred']['user'], self.CRED[self.CRED['app']]['cred']['pass'], self.CRED['app'])
 
 
 	def sendVideoID(self, VIDEO_ID):
@@ -211,9 +296,15 @@ class Client():
 		raw_response = r.text
 		jsonData = json.loads(raw_response)
 		try:
-			print("[-]", jsonData['errors'][0]['message'])
-			print("[!] Refresh your video ID")
+			if(jsonData['errors'][0]['message'] == "TokenExpiredError: jwt expired"):
+				self.updateAuth()
+			elif (jsonData['errors'][0]['message'] == "Unexpected error value: \"Watch time exceeded\""):
+				print("[-] Watch time exceeded. Try again later")
+				return 0
+			else:
+				print("[-]", jsonData['errors'][0]['message'])	
 			return 0
+
 		except Exception as e:
 			print("[+] Parsing Video data")
 			self.V_ID = jsonData["data"]["getLessonContent"]["lesson"]["_id"]
@@ -241,7 +332,7 @@ class Client():
 		elif(jsonData['output'] == 'Invalid device id'):
 			print("[!] Warning. Device must register")
 			self.CONFIG[self.CRED['app']]['status'] = 1
-			self.updateCredential()
+			self._updateCredential()
 			self.registerDevice()
 			exit()
 		else:
@@ -251,8 +342,18 @@ class Client():
 	def decodePlayList(self):
 
 		print("[+] Decode playlist")
-		self.PLAY_LIST_URL = self.PLAY_LIST_URL[:-8] + "v0/" + self.PLAY_LIST_URL[-8:]
+		if(str(self.main.combo.currentText()) == "480p"):
+			# self.PLAY_LIST_URL = self.PLAY_LIST_URL[:-8] + "v1/" + self.PLAY_LIST_URL[-8:]
+			self.PLAY_LIST_URL = self.PLAY_LIST_URL.replace("/playback", "/v1/playback")
+		else:
+			# self.PLAY_LIST_URL = self.PLAY_LIST_URL[:-8] + "01/" + self.PLAY_LIST_URL[-8:]
+			self.PLAY_LIST_URL = self.PLAY_LIST_URL.replace("/playback", "/v0/playback")
+
 		headers = self.merge(self.default_headers, {"Content-Type" : "application/json"})
+
+		if(DEBUG):
+			print(headers)
+			print(self.PLAY_LIST_URL)
 
 		r = self.session.request("POST", self.PLAY_LIST_URL, headers=headers)
 		if(r.status_code == 200):
@@ -260,6 +361,7 @@ class Client():
 			self.ENC_M3U8 = raw_response
 			return 1
 		else:
+			print("[-] Failed -", r.text)
 			return 0
 
 	def getM3u8(self):
@@ -276,6 +378,7 @@ class Client():
 			main.txtURL.setPlainText(jsonData['output'])
 			return 1
 		else:
+			print("[-] Failed", raw_response)
 			return 0
 
 class Login(QDialog):
@@ -299,7 +402,7 @@ class Login(QDialog):
 		self.ewings = QRadioButton("E Wings")
 		horizontal_box = QHBoxLayout()
 		horizontal_box.addWidget(self.aplus)
-		# horizontal_box.addWidget(self.ewings)
+		horizontal_box.addWidget(self.ewings)
 		
 		layout = QFormLayout(self)
 		layout.addRow(QLabel("Mobile Number"), self.txtMobile)
@@ -332,6 +435,7 @@ class Login(QDialog):
 		else:
 			PASSWORD = self.txtPass.text().strip()
 
+
 		if self.aplus.isChecked():
 			APP = 'Aplus'
 		if self.ewings.isChecked():
@@ -361,6 +465,15 @@ class Main(QWidget):
 		super().__init__(parent)
 
 		self.client = Client(self)
+		self.thread = QThread()
+		self.worker = Worker()
+		self.worker.moveToThread(self.thread)
+		self.thread.started.connect(self.worker.run)
+		self.worker.finished.connect(self.thread.quit)
+		# self.worker.finished.connect(self.worker.deleteLater)
+		# self.thread.finished.connect(self.thread.deleteLater)
+		self.thread.finished.connect(self._endDownload)
+		self.worker.progress.connect(self.statusUpdate)
 		self.setWindowTitle("aPlus Downloader | thiwaK")
 		# self.setWindowIcon(QtGui.QIcon('icon.png'))
 		# self.icon = QtGui.QIcon()
@@ -375,12 +488,15 @@ class Main(QWidget):
 		self.lblStat = QLabel()
 		self.lblTitle = QLabel()
 		self.txtURL = QTextEdit()
+		self.txtURL.setPlaceholderText("paste your url here") 
 		self.txtVideoID = QLineEdit()
+		self.txtVideoID.setPlaceholderText("0000-0000") 
 		self.btnDownload = QPushButton("Download")
 		self.btnGetLink = QPushButton("Get Link")
 		self.combo = QComboBox()
 		self.combo.addItem("480p")
 		self.combo.addItem("240p")
+		self.pbar = QProgressBar()
 
 		self.formGroupBoxA = QGroupBox("Video")
 		layout_a = QFormLayout()
@@ -398,68 +514,118 @@ class Main(QWidget):
 		self.formGroupBoxB.setLayout(layout_b)
 
 		self.formGroupBoxC = QGroupBox("")
-		layout_status = QFormLayout()
-		layout_status.addRow(QLabel("Status: "), self.lblStat)
-		self.formGroupBoxC.setLayout(layout_status)
+		self.layout_status = QFormLayout()
+		self.layout_status.addRow(QLabel("Status: "), self.lblStat)
+		self.layout_status.addRow(QLabel(""), self.pbar)
+		self.formGroupBoxC.setLayout(self.layout_status)
 		self.formGroupBoxC.setFlat(True)
 
 		self.formGroupBoxD = QGroupBox("User")
-		layout_status = QFormLayout()
-		layout_status.addRow(QLabel("Name: "), QLabel("%s %s"% (self.client.CRED[self.client.CRED['app']]['user']['fname'].title(), self.client.CRED[self.client.CRED['app']]['user']['lname'].title())))
-		layout_status.addRow(QLabel("ID: "), QLabel("%s" % self.client.CRED[self.client.CRED['app']]['user']['_id']))
-		# layout_status.addRow(QLabel("Name: "), QLabel("Your Name"))
-		# layout_status.addRow(QLabel("ID: "), QLabel("Your User ID"))
-		self.formGroupBoxD.setLayout(layout_status)
-
+		layout_user = QFormLayout()
+		layout_user.addRow(QLabel("Name: "), QLabel("%s %s"% (self.client.CRED[self.client.CRED['app']]['user']['fname'].title(), self.client.CRED[self.client.CRED['app']]['user']['lname'].title())))
+		layout_user.addRow(QLabel("ID: "), QLabel("%s" % self.client.CRED[self.client.CRED['app']]['user']['_id']))
+		# layout_user.addRow(QLabel("Name: "), QLabel("Your Name"))
+		# layout_user.addRow(QLabel("ID: "), QLabel("Your User ID"))
+		self.formGroupBoxD.setLayout(layout_user)
 
 		menubar = QMenuBar()
-		actionFile = menubar.addMenu("Options")
-		reAuth = actionFile.addAction("Reauthenticate")
-		reAuth.setShortcut('Ctrl+R')
-		reAuth.setStatusTip('Authenticate again')
-		reAuth.triggered.connect(self.reAuth)
-		
+		actionFile = menubar.addMenu("File")
 		exitAct = actionFile.addAction("Quit")
 		exitAct.setShortcut('Ctrl+Q')
 		exitAct.setStatusTip('Exit application')
 		exitAct.triggered.connect(qApp.quit)
+		
+		nextTheme = actionFile.addAction("Switch Theme")
+		nextTheme.setShortcut('')
+		nextTheme.triggered.connect(self.changeTheme)
+
+		actionUser = menubar.addMenu("User")
+		updateToken = actionUser.addAction("Reauthenticate")
+		updateToken.setShortcut('')
+		updateToken.triggered.connect(self.client.updateAuth)
+
+		reAuth = actionUser.addAction("Forced Reauthenticate")
+		reAuth.setShortcut('')
+		reAuth.triggered.connect(self.client.reAuth)
+
+		switchApp = ""
+		if(self.client.CRED['app'] == "Aplus"):
+			switchApp = actionUser.addAction("Switch to Ewings")
+			switchApp.setShortcut('')
+			# switchApp.triggered.connect(self.client.reAuth)
+		if(self.client.CRED['app'] == "Ewings"):
+			switchApp = actionUser.addAction("Switch to Aplus")
+			switchApp.setShortcut('')
+			# switchApp.triggered.connect(self.client.reAuth)
+
+		logout = actionUser.addAction("Logout")
+		logout.setShortcut('')
+		logout.triggered.connect(self.client.logout)
 
 		layout = QVBoxLayout()
 		layout.addWidget(menubar)
-		# layout.addWidget(QLabel(""))
-		# layout.addWidget(QLabel("  Logged in as %s %s" % (self.client.CRED[self.client.CRED['app']]['user']['fname'].title(), self.client.CRED[self.client.CRED['app']]['user']['lname'].title())))
-		# layout.addWidget(QLabel(""))
+		layout.addWidget(QLabel(""))
 		layout.addWidget(self.formGroupBoxD)
 		layout.addWidget(self.formGroupBoxA)
 		layout.addWidget(self.formGroupBoxB)
 		layout.addWidget(self.formGroupBoxC)
 		# layout.addWidget(self.lblMe)
 		self.setLayout(layout)
-
-		exitAct = QAction(QIcon('exit.png'), '&Exit', self)
-		exitAct.setShortcut('Ctrl+Q')
-		exitAct.setStatusTip('Exit application')
-		exitAct.triggered.connect(qApp.quit)
+		self.updateTheme()
 
 		
-
 		# self.lblMe.setText("<a href=https://github.com/thiwaK><font size=5 color=yellow><sub>thiwaK</sub></font></a>")
 		# self.lblMe.setAlignment(QtCore.Qt.AlignRight)
 		self.txtURL.setPlainText("")
+		self.pbar.hide()
 		self.btnDownload.clicked.connect(self.btnDownload_Clicked)
 		self.btnGetLink.clicked.connect(self.btnGetLink_Clicked)
 		self.statusUpdate()
 
-		# t1=Thread(target=self.init)
-		# t1.start()
 
-	def reAuth(self):
-		self.client.CRED[self.client.CRED['app']]['status'] = 0
-		self.client.updateCredential()
-		self.client.login(self.client.CRED[self.client.CRED['app']]['cred']['user'], self.client.CRED[self.client.CRED['app']]['cred']['pass'], self.client.CRED['app'])
+	def changeTheme(self):
+		if(self.client.default_config['theme'] == 0):
+			self.client.default_config['theme'] = 1
+		else:
+			self.client.default_config['theme'] = 0
+		self.client.writeDefaultConfig()
 
-	def Operation(self, URL):
-		URL = URL.strip()
+	def updateTheme(self):
+		if(self.client.default_config['theme'] == 0):
+			self.setStyleSheet(open('lib/light.qtheme').read())
+		if(self.client.default_config['theme'] == 1):
+			self.setStyleSheet(open('lib/dark.qtheme').read())
+		else:
+			self.setStyleSheet = ""
+
+	def runLongTask(self):
+		self.thread = QThread()
+		self.worker = Worker()
+		self.worker.moveToThread(self.thread)
+		self.thread.started.connect(self.worker.run)
+		self.worker.finished.connect(self.thread.quit)
+		self.worker.finished.connect(self.worker.deleteLater)
+		self.thread.finished.connect(self.thread.deleteLater)
+		self.worker.progress.connect(self.statusUpdate)
+		self.thread.start()
+		
+		self.thread.finished.connect(
+			lambda: self.lblTitle.setText("Long-Running Step: 0")
+		)
+
+	def btnDownload_Clicked(self):
+
+		self.btnDownload.setEnabled(False)
+		self.statusUpdate("Downloading...")
+		self.btnDownload.setText("Cancel Download")
+		self.btnDownload.setStyleSheet("background-color: #FF2B7D; color:#FFDAE8 ")
+		self.btnDownload.clicked.connect(self.cancelDownload)
+		self.btnDownload.setEnabled(True)
+		self.btnGetLink.setEnabled(False)
+		self.txtVideoID.setText("") 
+		
+
+		URL = self.txtURL.toPlainText().strip()
 		regex = re.compile(
 				r'^(?:http|ftp)s?://'
 				r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+(?:[A-Z]{2,6}\.?|[A-Z0-9-]{2,}\.?)|'
@@ -470,50 +636,50 @@ class Main(QWidget):
 
 		if not (re.match(regex, URL) is not None):
 			print("[-] Invalid URL")
+			self.statusUpdate("Invalid URL")
 			return
-		today = date.today()
-		now = datetime.now()
-		dt_string = now.strftime("%Y_%m_%d__%H.%M.%S")
 
-		print("\n\n - Save to : ", OUT,"\\",dt_string,".mp4")
-		print("-------------------------------------------------\n\n")
-		os.system(f"lib\\ffmpeg.exe -i \"{URL}\" -bsf:a aac_adtstoasc -v warning -stats -f mp4 -c copy \"{OUT}\\{dt_string}.mp4\"")
-		'''
-		# First 10 Minutes                      -ss 0 -t 00:10:00 
-		# Second 10 Minutes                     -ss 00:10:00 -t 00:20:00
-		# Rest after the first 20 Minutes       -ss 00:20:00
-		'''
+		self._startDownload(URL)
+		
+	def _startDownload(self, URL):
+		
+		self.worker.URL = URL
+		self.thread.start()
 
-	def btnDownload_Clicked(self):
-
-		self.btnDownload.setText("Downloading ...")
-		self.btnDownload.setEnabled(False)
-		self.txtVideoID.setText("")
-
-		URL = self.txtURL.toPlainText()
-		t1=Thread(target=self.Operation, args=(URL,))
-		t1.start()
-
+	def _endDownload(self):
+		self.btnDownload.clicked.connect(self.btnDownload_Clicked)
+		self.btnDownload.setStyleSheet("")
 		self.btnDownload.setText("Download")
 		self.btnDownload.setEnabled(True)
+		self.btnGetLink.setEnabled(True)
+		self.statusUpdate()
+	
+	def cancelDownload(self):
+
+		self.worker.kill()
 
 	def btnGetLink_Clicked(self):
 		self.txtURL.setPlainText("")
 		self.lblTitle.setText("")
 
 		self.statusUpdate("Initiating Download...")
+		QApplication.processEvents()
 		if(len(self.txtVideoID.text()) == 9):
 			
 			self.statusUpdate("Send video id...")
+			QApplication.processEvents()
 			if(self.client.sendVideoID(self.txtVideoID.text())):
 				
 				self.statusUpdate("Decrypt key...")
+				QApplication.processEvents()
 				if(self.client.decryptKey()):
 
 					self.statusUpdate("Decode playlist...")
+					QApplication.processEvents()
 					if(self.client.decodePlayList()):
 
 						self.statusUpdate("Get link...")
+						QApplication.processEvents()
 						self.client.getM3u8()
 						self.statusUpdate()
 					else:
@@ -530,7 +696,13 @@ class Main(QWidget):
 
 	def statusUpdate(self, text='idle'):
 		
-		self.lblStat.setText(text)
+		try:
+			text = int(text)
+			self.pbar.setValue(text)
+			self.pbar.show()
+		except:
+			self.pbar.hide()
+			self.lblStat.setText(str(text))
 
 if __name__ == '__main__':
 
