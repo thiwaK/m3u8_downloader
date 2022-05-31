@@ -20,6 +20,7 @@ try:
 	import time
 	import signal
 	import base64
+	import random
 	import subprocess
 	import json, base64
 except Exception:
