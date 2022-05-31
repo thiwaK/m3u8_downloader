@@ -1,8 +1,7 @@
 <p align="center">
 	<img src="https://raw.githubusercontent.com/thiwaK/m3u8_downloader/master/images/aPlus_Downloader_Logo.png" alt="aPlus Downloader Logo">
 </p>
-
-<h3 align="center">aPlus Downloader 1.0.35</h3>
+<h3 align="center">aPlus Downloader 1.0.35a</h3>
 <p align="center">
   Download m3u8 streams
   <br>
@@ -10,11 +9,12 @@
 
 
 
+
 ---
 
 [![Build Status](https://travis-ci.org/joemccann/dillinger.svg?branch=master)](https://travis-ci.org/joemccann/dillinger)
 
-aPlus Downloader originally developed to download videos hosted in Aplus education platform. By using a 9-digit code (xxxx-xxxx), this software able to generate an m3u8 link, which can be used to download the relevant video. By using that link or any other m3u8 link, this tool can save the video stream to local storage.
+aPlus Downloader originally developed to download videos hosted in Aplus education platform. By using a 9-digit code (xxxx-xxxx), this tool able to generate a m3u8 link, which can be used to download the relevant video. By using that link or any other m3u8 link, this tool can save the video stream to local storage.
 
 ---
 
